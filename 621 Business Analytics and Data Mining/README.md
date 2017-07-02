@@ -1,0 +1,6 @@
+# Predicting Interest Rates For Loans
+(Conor Buckley, Nathan Groom, Xingjia Wu)
+
+This project was focused on the Lending Club, a peer to peer lending startup in San Francisco. The purpose of this project was to determine the attributes most strongly linked to interest rates paid on personal loans, which may subsequently be used to advise any individual or family themselves looking to borrow money.
+The dataset consisted of 39,787 rows, each representing a loan given to a borrower. It includeed 51 columns, 50 of which represent predictor variables and the remaining variable, 'Interest Rate', representing our target variable. 
+After data cleaning and variable pre-selection, several regression models were applied on this dataset, including multiple linear regression with stepwise selection, regularized linear regression, and tree-based models such as random forest and gradient boosting machine (GBM), using packages built in the R statistical programming language. Selection of models was based on mean squared error (MSE) of prediction. Our lowest MSE was found with GBM models. The most relative influence of variables for these models were 'revol_util' (the revolving line utilization rate, the amount of credit the borrower is using relative to all available revolving credit) and 'term' (the number of payments on the loan).
