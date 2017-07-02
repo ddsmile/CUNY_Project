@@ -1,0 +1,409 @@
+---
+title: "IS607 Final Project"
+author: "Xingjia Wu"
+output: html_document
+---
+
+### **Background**
+
+Home location is the most important factor in home value. Identical homes can have dramatically different values due to the location. One of the factors that home buyers concern is the school district. 
+
+### **Hypothesis**
+
+The average prices of nearby houses are higher when the high schools get higher ranking. 
+
+
+```{r, message=FALSE}
+if (require(dplyr) == FALSE) {install.packages('dplyr')}
+if (require(ggmap) == FALSE) {install.packages('ggmap')}
+if (require(XML) == FALSE) {install.packages('XML')}
+if (require(gridExtra) == FALSE) {install.packages('gridExtra')}
+if (require(psych) == FALSE) {install.packages('psych')}
+library(dplyr)
+library(ggmap)
+library(ggplot2)
+library(XML)
+library(gridExtra)
+library(psych)
+```
+
+
+```{r, eval=FALSE}
+if (require(devtools) == FALSE) {install.packages('devtools')}
+library(devtools)
+if (require(rvest) == FALSE) {devtools::install_github("hadley/rvest")}
+library(rvest) 
+library(stringr)
+library(reshape2)
+```
+
+### **Data acquisition**
+
+*1) The rank and address of high school were web-scraped from the U.S. News rankings using rvest package.*
+
+Website: http://www.usnews.com/education/best-high-schools/national-rankings
+
+The U.S. News rankings include data on more than 19,400 public high schools in 50 states and the District of Columbia. However, only around 2100 public schools have ranking. 
+
+```{r, eval=FALSE}
+
+# Extract school rank, school name and address from usnews.com
+
+web <- 'http://www.usnews.com/education/best-high-schools/national-rankings/spp+100/page+'
+school <- data.frame(rankingscore = numeric(0), schoolname = character(0), 
+                     street = character(0), csz = character(0))
+for (i in 1:21){
+    url <- paste0(web, i)
+    website <- html(url)
+    rankingscore <- website %>% html_nodes("span.rankings-score span") %>% html_text()
+    if (length(rankingscore)< 100){
+        rankingscore <- append(rankingscore, rep(NA, 100-length(rankingscore)))
+    }
+    schoolname <- website %>% html_nodes("div.school-name a") %>% html_text()
+    street <- website %>% html_nodes("div.school-street") %>% html_text()
+    csz <- website %>% html_nodes("div.school-csz") %>% html_text()
+    all <- data.frame(cbind(rankingscore, schoolname, street, csz), 
+                      stringsAsFactors = FALSE)
+    school <- rbind(school, all)
+}
+
+# Convert ranking score into numeric format
+
+school$rankingscore <- as.numeric(str_replace_all(school$rankingscore, "[#,]", ""))
+school$schoolname <- str_replace_all(school$schoolname, "(<U\\+200B>)", "")
+
+# split csz into city, state and zipcode
+
+csz <- colsplit(school$csz, ',', c('city', 'sz')) 
+csz1 <- data.frame(str_split_fixed(str_trim(csz$sz), ' ', n = 2), 
+                   stringsAsFactors = FALSE)
+names(csz1) <- c('state', 'zipcode')
+split_csz<- setNames(data.frame(cbind(csz$city, csz1$state, csz1$zipcode),
+                                stringsAsFactors = FALSE), c('city', 'state', 'zipcode'))
+
+# Combine into final school dataframe
+schoolranking <- cbind(school[1:3], split_csz)
+
+```
+
+
+*2) Zillow Home Value Index (zillowIndex) was used to present the average home price around the ranked high schools.*
+
+The Zillow Home Value Index is the median Zestimate home valuation (Zillow's estimated market value). ZillowIndex was queried through Zillow GetDemographics API. Website: http://www.zillow.com/howto/api/GetDemographics.htm
+
+Due to the limitation of 1000 queries per day by zillow API, the dataset was devided into 3 parts (900, 900 and 300 records respectively). The query was run once per day for each part. The completed dataset was combined using rbind() function. 
+
+
+```{r, eval=FALSE}
+
+# Create function that takes zipcode and query the zillow home value index from zillowAPI
+
+getZillow <- function(zip){
+    url <- paste0("http://www.zillow.com/webservice/GetDemographics.htm?zws-id=X1-ZWz1dx93rz7eob_9fxlx&zip=", zip)
+    doc <- xmlParse(url)
+    e <- xpathSApply(doc, path = "//response/pages//attribute/name[contains(text(), 'Zillow Home Value Index')]/..//zip/value", xmlValue)
+    return (e)
+}
+
+# Divide schoolranking into three parts, retrieve zillowindex from zillow API one part a day. 
+part1 <- schoolranking[1:900, ]
+part2 <- schoolranking[901:1800, ]
+part3 <- schoolranking[1801:2100, ]
+
+zillowindex1 <- lapply(part1$zipcode, getZillow)
+zillowindex1[sapply(zillowindex1, is.null)] <- NA
+zillowindex1 <- unlist(zillowindex1)
+part1final <- cbind(part1, zillowindex1)
+
+zillowindex2 <- lapply(part2$zipcode, getZillow)
+zillowindex2[sapply(zillowindex2, is.null)] <- NA
+zillowindex2 <- unlist(zillowindex2)
+part2final <- cbind(part2, zillowindex2)
+
+zillowindex3 <- lapply(part3$zipcode, getZillow)
+zillowindex3[sapply(zillowindex3, is.null)] <- NA
+zillowindex3 <- unlist(zillowindex3)
+part3final <- cbind(part3, zillowindex3)
+
+row.names(part1final)<-NULL
+row.names(part2final)<-NULL
+row.names(part3final)<-NULL
+
+names(part1final) <- c('rank', 'school', 'street', 'city', 'state', 
+                       'zipcode', 'zillowindex')
+names(part2final) <- c('rank', 'school', 'street', 'city', 'state', 
+                       'zipcode', 'zillowindex')
+names(part3final) <- c('rank', 'school', 'street', 'city', 'state', 
+                       'zipcode', 'zillowindex')
+
+rank <- rbind(part1final, part2final, part3final)
+
+save(rank, file = "C:/temp/rank.rda")
+```
+
+*3) The latitude and longitude coordinates of the zipcodes were obtained by ggmap package.*
+
+```{r, eval=FALSE}
+# Obtain lat and lon by geocode() function in ggmap package
+lonlat <- geocode(rank$zipcode)
+schoolrank <- cbind(rank, lonlat)
+save(schoolrank, file = "C:/temp/schoolrank.rda")
+```
+The final dataset was saved as .rda file and uploaded to the public folder in dropbox. 
+
+
+### **Data transformation and cleanup**
+
+The .rda file was downloaded from dropbox directly.
+```{r}
+
+# load("C:/temp/schoolrank.rda") 
+
+setInternet2(use = TRUE)
+
+download.file("https://dl.dropboxusercontent.com/u/8963938/schoolrank.rda", 
+              destfile="./schoolrank.rda")
+
+load("./schoolrank.rda")
+
+```
+
+*1) Convert zillowIndex from character into numeric*
+
+```{r}
+schoolrank$zillowindex <- as.character(schoolrank$zillowindex)
+schoolrank$zillowindex <- as.numeric(schoolrank$zillowindex)
+
+```
+
+*2) Convert rank column into integer*
+
+```{r}
+schoolrank$rank <- as.integer(schoolrank$rank)
+```
+
+*3) Remove the records in 'rank' column that contains NA (without rank)*
+
+```{r}
+school <- schoolrank %>% filter (!is.na(rank))
+# From 2100 to 2019 
+```
+
+*4) Remove the records in 'zillowindex' column that contains NA (no local zillowIndex on that zipcode)*
+
+```{r}
+school <- school %>% filter (!is.na(zillowindex))
+# From 2019 to 1472
+```
+
+*5) Remove the state that has less than 3 schools (TX and DE)*
+
+```{r}
+state.lt3 <- as.list(school %>% group_by(state) %>% 
+                         summarise(count = n()) %>% filter(count < 3) %>% 
+                         select(state))
+names(state.lt3)<-NULL
+state.lt3<-unlist(state.lt3)
+
+school <- school[!school$state %in% state.lt3,] 
+# From 1472 to 1469
+
+```
+
+### **Descriptive statistics**
+
+*1) Summary of dataset*
+
+```{r}
+summary(school)
+```
+
+*2) Total states included in the data: 34*
+
+```{r}
+length(unique(school$state))
+```
+
+*3) Rank: from 2 to 2019*
+
+```{r}
+summary(school$rank)
+```
+
+*4) zillowIndex: range from 35,700 to 3,068,900, right-skewed*
+
+```{r}
+describe(school$zillowindex)
+ggplot(school, aes(x=zillowindex)) + 
+    geom_histogram(aes(y=..density..), binwidth=80000, color='black', fill='white') +
+    geom_density(alpha=.2, fill="#003399") +
+    ggtitle('ZillowIndex histogram overlaid with density curve') +
+    theme_bw()
+# Ref: http://www.cookbook-r.com/Graphs/Plotting_distributions_%28ggplot2%29/
+```
+
+
+### **Data analysis**
+
+*1) Geographical distribution of rank and zillowIndex*
+
+Expensive houses are located at west coast and northeast coast.
+```{r, message=FALSE}
+map <- get_map(location = 'United states', zoom = 4, 
+               maptype = 'roadmap', source = 'google', color = 'color')
+```
+```{r, fig.width=11, fig.height=11}
+ggmap(map) + geom_point(aes(x=lon, y=lat, colour=zillowindex), 
+                        data=school,  alpha = 0.6, size=3, na.rm = T)  + 
+  scale_color_gradient(low="#3333FF", high="#FF3300") +
+    ggtitle('Distribution: Zillow House Value Index')
+```
+
+Schools with different ranks are more evenly distributed. 
+```{r, fig.width=11, fig.height=11}
+ggmap(map) + geom_point(aes(x=lon, y=lat, colour=rank), data=school, 
+                        alpha = 0.8, size=3, na.rm = T)  + 
+    scale_color_gradient(low="#FF3300", high="#3333FF") +
+    ggtitle('Distribution: School rank')
+```
+
+*2) Relationship between school rank and zillowIndex*
+
+```{r}
+ggplot(school, aes(x=rank, y=zillowindex/1000)) + 
+    geom_point(color= "#0066CC", alpha = 0.6) + coord_trans(y = "log10") + 
+    stat_smooth(color="#990066", size = 1, method = "lm") +
+    xlab('school rank') +
+    ylab("zillowIndex in thousand (log10 scale)") +
+    ggtitle('zillowIndex ~ school rank') +
+    theme_bw()
+```
+
+Correlation: weak downhill (negative) linear relationship (-0.3305684)
+
+```{r}
+cor(school$zillowindex, school$rank)
+```
+
+*3) summary statistics: zillowIndex and school rank group by states*
+
+```{r, fig.width=11, fig.height=8}
+
+describe <- describeBy(school$zillowindex, school$state, mat=TRUE)
+describe_rank <- describeBy(school$rank, school$state, mat=TRUE)
+
+p1 <- ggplot(describe, aes(x=group1, y=mean/1000)) + 
+  geom_bar(stat="identity", fill="#003399") +
+  geom_text(aes(label=n), vjust = -1) +
+  xlab('State') +
+  ylim(0, 750) +
+  ylab('average zillow index in thousand') +
+  ggtitle('Average zillow index in states') +
+  theme_bw()
+
+p2 <- ggplot(describe_rank, aes(x=group1, y=mean)) + 
+  geom_bar(stat="identity", fill="#003399") +
+  geom_text(aes(label=round(mean)), vjust = -1, size = 3) +
+  xlab('State') +
+  ylim(0, 1650) +
+  ylab('average school rank') +
+  ggtitle('Average school rank in states') +
+  theme_bw()
+
+grid.arrange(p1, p2, nrow=2)
+```
+
+Correlation for each state.
+
+```{r}
+school %>% 
+  group_by(state) %>% 
+  summarize(count= n(), cor = cor(rank, zillowindex)) %>% 
+  arrange(cor)
+```
+
+
+### **Conclusions**
+
+Across the country, there is weak coorrelation between rank of school and average house value (zillow house value index) in surrounding area. By state, the correlation coefficients were highly different. Most of states show negative correlation between school and average house value. 
+
+
+
+**Discussion**
+
+Although there is trend that the average house value is higher when rank of school is better, it's not strong correlated. Other factors, such as local economy and security of the neighborhood, also play important roles on house value. This analysis was only based on the top 10% of total public high schools (1469 schools in 34 states out of around 20,000 public high schools in the USA). The results may not represent the overall population. 
+
+
+**New features**
+
+1. ggmap
+
+2. psych: describe(), describeBy()
+
+
+**Challenges**
+
+1. Data Acquisition 
+
+- rvest package: missing NULL values when unlist. Had to transform NULL into NA.
+
+- Zillow API only allows 1000 queries per day. 
+
+- XML package: Xpath query.
+
+2. Data analysis
+
+- ggmap
+
+
+**Appendix**
+
+*Appendix 1. Plot of zillowIndex and rank in Arkansas (cor = -0.80913707)*
+
+```{r}
+school %>% filter(state == 'AR') %>% 
+    ggplot(aes(x=rank, y=zillowindex/1000)) + 
+    geom_point(color= "#0066CC", alpha = 0.6) + 
+    stat_smooth(color="#990066", size = 1, method = "lm", se=FALSE) +
+    xlab('school rank') +
+    ylab("zillowIndex in thousands") +
+    ggtitle('zillowIndex ~ school rank in Arkansas') +
+    theme_bw()
+```
+
+
+*Appendix 2. Bin the zillowIndex into three catogeries: low (below Q1), medium (Q1 to Q3) and high (above Q3).*
+
+```{r}
+school$valuelevel <- cut(school$zillowindex, breaks = c(0, 183200, 495100, 3069000), 
+                         labels=c("Low","Medium","High"), include.lowest=TRUE)
+ggplot(school, aes(x=rank, y=zillowindex/10000)) + 
+    geom_point(alpha = 0.6) + 
+    stat_smooth(method = "lm") +
+    facet_wrap(~valuelevel, scales = "free_y") +
+    xlab('school rank') +
+    ylab('zillowIndex in thousands') 
+```
+
+Medium and high zillowIndex tend to have negative correlation, while low zillowIndex didn't show much correlation.
+
+```{r}
+    
+ggplot(school, aes(x=valuelevel, y=rank)) +
+    geom_boxplot() +
+    xlab('zillowIndex') +
+    ylab('school rank')
+```
+
+
+Correlation for each house value level.
+
+```{r}
+school %>% 
+  group_by(valuelevel) %>% 
+  summarize(count= n(), cor = cor(rank, zillowindex)) 
+```
+
+No strong correlation for each group. 
+
+
