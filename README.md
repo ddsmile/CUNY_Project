@@ -3,36 +3,36 @@ This folder contains several final projects thoughout my MSDA program in CUNY SP
 
 1) 602 Advanced Programming Techniques
 
-  Project: Data Analysis on Ebola Virus epidemics in 2014
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Project: Data Analysis on Ebola Virus epidemics in 2014
 
-  Language: Python
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Language: Python
 
 2) 604 Simulation and Modeling Techniques
 
-  Project: Degrees of Separation in an Online Social Network
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Project: Degrees of Separation in an Online Social Network
 
-  Language: R
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Language: R
 
 3) 607 Data Acquisition and Management
 
-  Project: Correlation Between High School Rank and House Value
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Project: Correlation Between High School Rank and House Value
 
-  Language: R
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Language: R
 
 4) 621 Business Analytics and Data Mining
 
-  Project: Predicting Interest Rates For Loans
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Project: Predicting Interest Rates For Loans
 
-  Language: R
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Language: R
 
 5) 622 Big Data and Machine Learning
 
-  Project: Emotion Detection from Facial Expression
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Project: Emotion Detection from Facial Expression
 
-  Language: Python
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Language: Python
 
 6) 643 Recommender Systems
 
-  Project: Movie Recommendation System
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Project: Movie Recommendation System
 
-  Language: Python 
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Language: Python 
